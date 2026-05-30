@@ -1,4 +1,4 @@
-# busbar-actions/sf-metadata-pull
+# busbar-actions/sf-metadata-retrieve
 
 Retrieve Salesforce metadata from an org and write it into the repo as a source-format tree (or as an MDAPI zip).
 
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: busbar-actions/sf-metadata-pull@v1
+      - uses: busbar-actions/sf-metadata-retrieve@v1
         with:
           sf-access-token: ${{ secrets.SF_ACCESS_TOKEN }}
           sf-instance-url: ${{ secrets.SF_INSTANCE_URL }}
@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: busbar-actions/sf-metadata-pull@v1
+      - uses: busbar-actions/sf-metadata-retrieve@v1
         with:
           sf-access-token: ${{ secrets.SF_ACCESS_TOKEN }}
           sf-instance-url: ${{ secrets.SF_INSTANCE_URL }}
@@ -99,7 +99,7 @@ jobs:
 ## Example: pin to a manifest
 
 ```yaml
-- uses: busbar-actions/sf-metadata-pull@v1
+- uses: busbar-actions/sf-metadata-retrieve@v1
   with:
     sf-access-token: ${{ secrets.SF_ACCESS_TOKEN }}
     sf-instance-url: ${{ secrets.SF_INSTANCE_URL }}

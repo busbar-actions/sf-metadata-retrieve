@@ -85,11 +85,11 @@ inputs:
     default: 'metadata'
 
   version:
-    description: 'sf-metadata-pull release tag to download (e.g. v0.4.2). "latest" resolves the most recent release.'
+    description: 'sf-metadata-retrieve release tag to download (e.g. v0.4.2). "latest" resolves the most recent release.'
     required: false
     default: 'latest'
   binary-repo:
-    description: 'GitHub repo that publishes the sf-metadata-pull binary releases.'
+    description: 'GitHub repo that publishes the sf-metadata-retrieve binary releases.'
     required: false
     default: 'busbar-actions/actions-dist'
 
@@ -132,20 +132,20 @@ runs:
         os="${{ runner.os }}"
         arch="${{ runner.arch }}"
         case "$os-$arch" in
-          Linux-X64)   name="sf-metadata-pull-x86_64-unknown-linux-gnu" ;;
-          Linux-ARM64) name="sf-metadata-pull-aarch64-unknown-linux-gnu" ;;
-          macOS-X64)   name="sf-metadata-pull-x86_64-apple-darwin" ;;
-          macOS-ARM64) name="sf-metadata-pull-aarch64-apple-darwin" ;;
-          Windows-X64) name="sf-metadata-pull-x86_64-pc-windows-msvc.exe" ;;
+          Linux-X64)   name="sf-metadata-retrieve-x86_64-unknown-linux-gnu" ;;
+          Linux-ARM64) name="sf-metadata-retrieve-aarch64-unknown-linux-gnu" ;;
+          macOS-X64)   name="sf-metadata-retrieve-x86_64-apple-darwin" ;;
+          macOS-ARM64) name="sf-metadata-retrieve-aarch64-apple-darwin" ;;
+          Windows-X64) name="sf-metadata-retrieve-x86_64-pc-windows-msvc.exe" ;;
           *) echo "::error::Unsupported runner: $os-$arch"; exit 1 ;;
         esac
         echo "name=$name" >> "$GITHUB_OUTPUT"
 
-    - name: Download sf-metadata-pull binary
+    - name: Download sf-metadata-retrieve binary
       shell: bash
       run: |
         set -euo pipefail
-        bin_dir="${RUNNER_TEMP}/sf-metadata-pull"
+        bin_dir="${RUNNER_TEMP}/sf-metadata-retrieve"
         mkdir -p "$bin_dir"
         gh release download "${{ steps.tag.outputs.tag }}" \
           --repo "${{ inputs.binary-repo }}" \
@@ -154,10 +154,10 @@ runs:
         bin_path="$bin_dir/${{ steps.asset.outputs.name }}"
         chmod +x "$bin_path"
         echo "$bin_dir" >> "$GITHUB_PATH"
-        if [[ "$bin_path" != "$bin_dir/sf-metadata-pull" && "$bin_path" != "$bin_dir/sf-metadata-pull.exe" ]]; then
+        if [[ "$bin_path" != "$bin_dir/sf-metadata-retrieve" && "$bin_path" != "$bin_dir/sf-metadata-retrieve.exe" ]]; then
           ext=""
           [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
-          ln -sf "$bin_path" "$bin_dir/sf-metadata-pull$ext"
+          ln -sf "$bin_path" "$bin_dir/sf-metadata-retrieve$ext"
         fi
       env:
         GH_TOKEN: ${{ github.token }}
@@ -198,8 +198,8 @@ runs:
         fi
 
         mkdir -p "${{ inputs.target }}"
-        log="${RUNNER_TEMP}/sf-metadata-pull-metadata.log"
-        sf-metadata-pull "${args[@]}" --json 2>&1 | tee "$log"
+        log="${RUNNER_TEMP}/sf-metadata-retrieve-metadata.log"
+        sf-metadata-retrieve "${args[@]}" --json 2>&1 | tee "$log"
 
         # The subcommand prints a final JSON summary line: {"component_count": N, ...}
         # Parse the last JSON object on stdout for counts.

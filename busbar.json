@@ -3,8 +3,8 @@
   "schemaVersion": "2",
   "type": "action",
   "module": {
-    "id": "sf-metadata-pull",
-    "name": "Pull Metadata",
+    "id": "sf-metadata-retrieve",
+    "name": "Retrieve Metadata",
     "category": "code",
     "icon": "pull",
     "blurb": "Retrieve Salesforce metadata into the repo as a source-format tree (or MDAPI zip).",
@@ -14,7 +14,7 @@
     "compatibilityNote": null
   },
   "interface": {
-    "uses": "busbar-actions/sf-metadata-pull@v1",
+    "uses": "busbar-actions/sf-metadata-retrieve@v1",
     "inputs": [
       {
         "name": "target",
