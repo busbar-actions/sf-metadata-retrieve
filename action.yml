@@ -96,7 +96,7 @@ inputs:
 outputs:
   changed:
     description: '"true" if the pull produced changes vs the prior tree.'
-    value: ${{ steps.diff.outputs.changed }}
+    value: ${{ steps.pull.outputs.changed }}
   target-path:
     description: 'Path where metadata was written (echoes the input).'
     value: ${{ inputs.target }}
@@ -107,60 +107,21 @@ outputs:
     description: 'Number of components retrieved.'
     value: ${{ steps.pull.outputs.component-count }}
 
+# The binary owns all logic and UX: it reads its inputs from INPUT_*, retrieves
+# the metadata, writes the target tree, computes component/file counts, writes
+# GITHUB_OUTPUT, the step summary, an annotation and the PR-comment body, and
+# commits the retrieved tree back (emitting `changed`). This action only installs
+# it, passes inputs through, and wires the two GitHub-native publish steps
+# (artifact upload, PR comment).
 runs:
   using: 'composite'
   steps:
-    - name: Resolve release tag
-      id: tag
-      shell: bash
-      run: |
-        set -euo pipefail
-        if [[ "${{ inputs.version }}" == "latest" ]]; then
-          tag=$(gh release view --repo "${{ inputs.binary-repo }}" --json tagName -q .tagName)
-        else
-          tag="${{ inputs.version }}"
-        fi
-        echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      env:
-        GH_TOKEN: ${{ github.token }}
-
-    - name: Determine asset name
-      id: asset
-      shell: bash
-      run: |
-        set -euo pipefail
-        os="${{ runner.os }}"
-        arch="${{ runner.arch }}"
-        case "$os-$arch" in
-          Linux-X64)   name="sf-metadata-retrieve-x86_64-unknown-linux-gnu" ;;
-          Linux-ARM64) name="sf-metadata-retrieve-aarch64-unknown-linux-gnu" ;;
-          macOS-X64)   name="sf-metadata-retrieve-x86_64-apple-darwin" ;;
-          macOS-ARM64) name="sf-metadata-retrieve-aarch64-apple-darwin" ;;
-          Windows-X64) name="sf-metadata-retrieve-x86_64-pc-windows-msvc.exe" ;;
-          *) echo "::error::Unsupported runner: $os-$arch"; exit 1 ;;
-        esac
-        echo "name=$name" >> "$GITHUB_OUTPUT"
-
-    - name: Download sf-metadata-retrieve binary
-      shell: bash
-      run: |
-        set -euo pipefail
-        bin_dir="${RUNNER_TEMP}/sf-metadata-retrieve"
-        mkdir -p "$bin_dir"
-        gh release download "${{ steps.tag.outputs.tag }}" \
-          --repo "${{ inputs.binary-repo }}" \
-          --pattern "${{ steps.asset.outputs.name }}" \
-          --dir "$bin_dir"
-        bin_path="$bin_dir/${{ steps.asset.outputs.name }}"
-        chmod +x "$bin_path"
-        echo "$bin_dir" >> "$GITHUB_PATH"
-        if [[ "$bin_path" != "$bin_dir/sf-metadata-retrieve" && "$bin_path" != "$bin_dir/sf-metadata-retrieve.exe" ]]; then
-          ext=""
-          [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
-          ln -sf "$bin_path" "$bin_dir/sf-metadata-retrieve$ext"
-        fi
-      env:
-        GH_TOKEN: ${{ github.token }}
+    - name: Set up sf-metadata-retrieve
+      uses: busbar-actions/setup@main
+      with:
+        binary: sf-metadata-retrieve
+        version: ${{ inputs.version }}
+        binary-repo: ${{ inputs.binary-repo }}
 
     - name: Pull metadata
       id: pull
@@ -168,58 +129,24 @@ runs:
       env:
         SF_ACCESS_TOKEN: ${{ inputs.sf-access-token }}
         SF_INSTANCE_URL: ${{ inputs.sf-instance-url }}
-      run: |
-        set -euo pipefail
-
-        args=(metadata pull
-          --target "${{ inputs.target }}"
-          --format "${{ inputs.format }}")
-
-        if [[ -n "${{ inputs.package-xml }}" ]]; then
-          args+=(--package-xml "${{ inputs.package-xml }}")
-        fi
-        if [[ -n "${{ inputs.types }}" ]]; then
-          args+=(--types "${{ inputs.types }}")
-        fi
-        if [[ -n "${{ inputs.components }}" ]]; then
-          args+=(--components "${{ inputs.components }}")
-        fi
-        if [[ -n "${{ inputs.since }}" ]]; then
-          args+=(--since "${{ inputs.since }}")
-        fi
-        if [[ -n "${{ inputs.api-version }}" ]]; then
-          args+=(--api-version "${{ inputs.api-version }}")
-        fi
-
-        manifest_out=""
-        if [[ "${{ inputs.emit-manifest }}" == "true" ]]; then
-          manifest_out="${{ inputs.target }}/${{ inputs.manifest-path }}"
-          args+=(--emit-manifest "$manifest_out")
-        fi
-
-        mkdir -p "${{ inputs.target }}"
-        log="${RUNNER_TEMP}/sf-metadata-retrieve-metadata.log"
-        sf-metadata-retrieve "${args[@]}" --json 2>&1 | tee "$log"
-
-        # The subcommand prints a final JSON summary line: {"component_count": N, ...}
-        # Parse the last JSON object on stdout for counts.
-        count=$(grep -oE '"component_count"[[:space:]]*:[[:space:]]*[0-9]+' "$log" | grep -oE '[0-9]+' | tail -n1 || true)
-        echo "component-count=${count:-0}" >> "$GITHUB_OUTPUT"
-        echo "manifest-path=$manifest_out" >> "$GITHUB_OUTPUT"
-
-    - name: Detect changes
-      id: diff
-      shell: bash
-      run: |
-        set -euo pipefail
-        if [[ -z "$(git status --porcelain -- "${{ inputs.target }}")" ]]; then
-          echo "changed=false" >> "$GITHUB_OUTPUT"
-        else
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-        fi
+        INPUT_TARGET: ${{ inputs.target }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_PACKAGE_XML: ${{ inputs.package-xml }}
+        INPUT_TYPES: ${{ inputs.types }}
+        INPUT_COMPONENTS: ${{ inputs.components }}
+        INPUT_SINCE: ${{ inputs.since }}
+        INPUT_API_VERSION: ${{ inputs.api-version }}
+        INPUT_EMIT_MANIFEST: ${{ inputs.emit-manifest }}
+        INPUT_MANIFEST_PATH: ${{ inputs.manifest-path }}
+        INPUT_COMMIT: ${{ inputs.commit }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        INPUT_GIT_USER_NAME: ${{ inputs.git-user-name }}
+        INPUT_GIT_USER_EMAIL: ${{ inputs.git-user-email }}
+        INPUT_COMMENT_OUTPUT: ${{ runner.temp }}/metadata-comment.md
+      run: sf-metadata-retrieve
 
     - name: Upload artifact
-      if: inputs.upload-artifact == 'true'
+      if: always() && inputs.upload-artifact == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
@@ -227,43 +154,11 @@ runs:
         if-no-files-found: warn
 
     - name: Post PR comment
-      if: inputs.comment-pr == 'true' && github.event_name == 'pull_request'
+      if: always() && inputs.comment-pr == 'true' && github.event_name == 'pull_request'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
-        COUNT: ${{ steps.pull.outputs.component-count }}
-        CHANGED: ${{ steps.diff.outputs.changed }}
-        TARGET: ${{ inputs.target }}
       run: |
         set -euo pipefail
-        if [[ "$CHANGED" == "false" ]]; then
-          body=$'### ⬇️ busbar metadata-pull\n\nNo changes against the current tree.'
-        else
-          # Show top changed metadata types from git status.
-          types=$(git status --porcelain -- "$TARGET" \
-            | awk '{print $NF}' \
-            | sed -E "s|^$TARGET/||" \
-            | awk -F/ '{print $1}' \
-            | sort | uniq -c | sort -rn | head -10 \
-            | awk '{printf "| %s | %d |\n", $2, $1}')
-
-          body="### ⬇️ busbar metadata-pull
-
-Retrieved **$COUNT components** into \`$TARGET\` — diff vs current tree shown below.
-
-| Type / Folder | Changed files |
-|---|---:|
-$types"
-        fi
-        gh pr comment "${{ github.event.pull_request.number }}" --body "$body"
-
-    - name: Commit changes
-      if: inputs.commit == 'true' && steps.diff.outputs.changed == 'true'
-      shell: bash
-      run: |
-        set -euo pipefail
-        git config user.name  "${{ inputs.git-user-name }}"
-        git config user.email "${{ inputs.git-user-email }}"
-        git add -- "${{ inputs.target }}"
-        git commit -m "${{ inputs.commit-message }}"
-        git push
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --body-file "${RUNNER_TEMP}/metadata-comment.md"
