@@ -186,6 +186,9 @@ runs:
       with:
         name: ${{ inputs.artifact-name }}
         path: ${{ inputs.target }}
+        # `target` is often a dot-dir (e.g. .test-metadata); upload-artifact@v4
+        # excludes hidden files by default, so opt in to keep the retrieved tree.
+        include-hidden-files: true
         if-no-files-found: error
 
     - name: Post the metadata-retrieve summary as a PR comment
