@@ -16,33 +16,6 @@ inputs:
     required: false
     default: ''
 
-  eca-client-id:
-    description: 'OPTIONAL override of the External Client App consumer key (client_id) used for the OIDC exchange. Has a PBO-pinned default; only set this on a consumer-key rotation.'
-    required: false
-    default: ''
-  token-handler:
-    description: 'OPTIONAL override of the Apex token-exchange handler dev name. Defaults to BBGitHubTokenExchangeHandler.'
-    required: false
-    default: ''
-  oidc-audience:
-    description: 'OPTIONAL override of the audience requested in the GitHub OIDC token. Defaults to the target-instance URL.'
-    required: false
-    default: ''
-
-  sf-access-token:
-    description: |
-      OPTIONAL local-dev / advanced override: a handed-off Salesforce session
-      access token. If set (together with sf-instance-url), the binary uses it
-      DIRECTLY and SKIPS the OIDC exchange. Leave empty in CI — prefer the
-      OIDC `target-instance` path so no SF token is ever passed through the
-      workflow.
-    required: false
-    default: ''
-  sf-instance-url:
-    description: 'OPTIONAL local-dev / advanced override paired with sf-access-token. Salesforce instance URL, e.g. https://yourdomain.my.salesforce.com'
-    required: false
-    default: ''
-
   target:
     description: 'Where the retrieved metadata is written, relative to the repo root.'
     required: false
@@ -104,15 +77,14 @@ inputs:
     description: 'Artifact name when upload-artifact=true.'
     required: false
     default: 'metadata'
-
   version:
-    description: 'sf-metadata-retrieve release tag to download (e.g. v0.4.2). "latest" resolves the most recent release.'
+    description: 'Release tag of the sf-metadata-retrieve binary. Falls back to env.BUSBAR_ACTION_VERSION, then "latest".'
     required: false
-    default: 'latest'
+    default: ''
   binary-repo:
-    description: 'GitHub repo that publishes the sf-metadata-retrieve binary releases.'
+    description: 'GitHub repo hosting prebuilt binary releases. Falls back to env.BUSBAR_ACTION_REPO, then busbar-actions/actions-dist.'
     required: false
-    default: 'busbar-actions/actions-dist'
+    default: ''
 
 outputs:
   changed:
@@ -144,8 +116,8 @@ runs:
       uses: busbar-actions/setup@main
       with:
         binary: sf-metadata-retrieve
-        version: ${{ inputs.version }}
-        binary-repo: ${{ inputs.binary-repo }}
+        version: ${{ inputs.version || env.BUSBAR_ACTION_VERSION || 'latest' }}
+        binary-repo: ${{ inputs.binary-repo || env.BUSBAR_ACTION_REPO || 'busbar-actions/actions-dist' }}
 
     - name: Retrieve the requested metadata from the Busbar-equipped org into the source tree
       id: pull
@@ -158,11 +130,7 @@ runs:
         # local-dev override; when it is absent, busbar-auth performs the in-process
         # OIDC token exchange. NO Salesforce token is ever written to GITHUB_ENV or
         # handed off between steps.
-        SF_INSTANCE_URL: ${{ inputs.target-instance != '' && inputs.target-instance || inputs.sf-instance-url }}
-        SF_ACCESS_TOKEN: ${{ inputs.sf-access-token }}
-        ECA_CLIENT_ID: ${{ inputs.eca-client-id }}
-        TOKEN_HANDLER_APEX: ${{ inputs.token-handler }}
-        OIDC_AUDIENCE: ${{ inputs.oidc-audience }}
+        SF_INSTANCE_URL: ${{ inputs.target-instance || env.SF_INSTANCE_URL }}
         INPUT_TARGET: ${{ inputs.target }}
         INPUT_PACKAGE_XML: ${{ inputs.package-xml }}
         INPUT_TYPES: ${{ inputs.types }}

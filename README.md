@@ -27,7 +27,7 @@ Backed by the `sf-metadata-retrieve` Rust binary (published to `busbar-actions/a
 |---|---|---|---|
 | `target-instance` | yes* | `` | Busbar-equipped org instance URL for the OIDC self-mint (e.g. `https://acme.my.salesforce.com`). *Required unless you supply the `sf-access-token`/`sf-instance-url` override. Requires `permissions: id-token: write`. |
 | `eca-client-id` | no | `` | Override the External Client App consumer key for the OIDC exchange. PBO-pinned default; set only on a rotation. |
-| `token-handler` | no | `` | Override the Apex token-exchange handler dev name. Defaults to `BBGitHubTokenExchangeHandler`. |
+| `token-handler` | no | `` | Override the Apex token-exchange handler dev name. Defaults to `GitHubTokenExchangeHandler`. |
 | `oidc-audience` | no | `` | Override the audience requested in the GitHub OIDC token. Defaults to `target-instance`. |
 | `sf-access-token` | no | `` | OPTIONAL local-dev/advanced override: a handed-off Salesforce session access token. When set (with `sf-instance-url`) the binary uses it directly and skips OIDC. |
 | `sf-instance-url` | no | `` | OPTIONAL override paired with `sf-access-token`, e.g. `https://yourdomain.my.salesforce.com`. |
